@@ -1,0 +1,110 @@
+ //Tambahkan fungsi ini di employee
+ function cek_absen(){
+        $password = $_POST['password'];
+        $username = $_POST['username'];
+        $credential = array('name' => $username, 'password' => sha1($password));
+        $query = $this->db->get_where('user', $credential);
+         if ($query->num_rows() > 0) {
+            $queryes = $this->db->get_where('user', $credential)->result_array()[0]['user_id'];
+         
+        $cek = $this->db->get_where('attendance',
+                        array(
+                            'status' => 1,
+                            'date'=>strtotime(date("Y-m-d")),
+                            'user_id' => $queryes
+                    ));
+
+        if ($cek->num_rows() > 0) {
+            $result = [
+                    [
+                        "cek" => 'Pulang'
+                    ]
+            ];
+        }else{
+            $result = [
+                    [
+                        "cek" => 'Masuk'
+                    ]
+            ];
+        }
+         $ison = json_encode(array('result'=>$result));
+         echo $ison;
+     }else{
+        echo "gagal";
+     }
+    }
+
+        function insertAttendance_AS($images_uri,$userId){
+        $query = $this->db->get_where('attendance',
+            array(
+                'date'=>strtotime(date("Y-m-d")),
+                'user_id' => $userId
+        ));
+        if($query->num_rows() < 1)
+            $attn_data['attendance_code']   = substr(md5(rand(100000000, 20000000000)), 0, 7);
+            $attn_data['user_id']           = $userId;
+            $attn_data['date']              = strtotime(date("Y-m-d"));
+            $attn_data['status']            = 1;
+            $attn_data['lat']               = 0.0;
+            $attn_data['lng']               = 0.0;
+            $file                           = $images_uri;
+            if($file != ''){
+             // move_uploaded_file($_FILES['file']['tmp_name'], 'uploads/document/foto_absen/' . $file);
+               $cek = $this->db->get_where('attendance',
+            array(
+                'status' => 1,
+                'date'=>strtotime(date("Y-m-d")),
+                'user_id' => $userId
+                ));
+            if ($cek->num_rows() > 0) {
+                $id = $cek->row()->attendance_id;
+                $status = "out";
+            }else{
+                $this->db->insert('attendance', $attn_data);
+                $id = $this->db->insert_id();    
+                $status = "in";
+            }
+            $timestamp = strtotime(date("H:i")) + 60*60;
+
+            $time = date('H:i', $timestamp);
+            $array = array(
+                'attendance_id' => $id,
+                'jam' => $time,
+                'status' => $status,
+                'lat' => 0.0,
+                'lng' => 0.0,
+                'foto' => $file
+            );
+            $ceker = $this->db->get_where("in_out",['attendance_id'=>$query->row_array()['attendance_id'] , 'status'=>'in']);
+            $ceker2 = $this->db->get_where("in_out",['attendance_id'=>$query->row_array()['attendance_id'] , 'status'=>'out']);
+
+            $jam_s = explode(":",$ceker->row_array()['jam']);
+            $hasil = ltrim($jam_s[0]+3, '0');
+            
+            if($hasil > 24){
+                $hasil = ltrim($jam_s[0]+3, '0')-24;  
+            }
+
+            if($ceker->row_array()['jam'] == ""){
+                $this->crud_model->insertJam($array);
+                $this->session->set_flashdata('flash_message', get_phrase('absen_dimasukkan'));
+            }
+
+            else if(date("H") >= $hasil && $ceker2 -> num_rows() < 1){
+                $this->crud_model->insertJam($array);
+                $this->session->set_flashdata('flash_message', get_phrase('absen_dimasukkan'));
+                //var_dump("ok");
+            }
+            else if(date("H") < $hasil){
+                 $this->session->set_flashdata('flash_message', get_phrase('anda sudah absen masuk /Tunggu saat absen pulang'));
+            
+            }
+            
+           
+            }else{
+                $this->session->set_flashdata('flash_message', get_phrase('anda_harus_menyisipkan_foto'));    
+            }
+            
+            
+            redirect('Employee/dashboard','refresh');
+    }
